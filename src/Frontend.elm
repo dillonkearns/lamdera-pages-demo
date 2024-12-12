@@ -5,6 +5,7 @@ import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Http
 import Lamdera exposing (sendToBackend)
+import Pages
 import Types exposing (..)
 
 
@@ -19,7 +20,7 @@ additional update function; updateFromBackend.
 
 -}
 app =
-    Lamdera.frontend
+    Pages.frontend sendToBackend
         { init = \_ _ -> init
         , update = update
         , updateFromBackend = updateFromBackend

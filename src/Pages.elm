@@ -1,10 +1,23 @@
-module Pages exposing (BackendMsg, Blockable(..), HeadTag, Model, Msg, ServerRequest(..), ToBackend, ToFrontend, backend, frontend)
+module Pages exposing (BackendMsg, Blockable(..), FrontendMsg, HeadTag, Model, ServerRequest(..), ToBackend, ToFrontend, backend, frontend, toBackendMsg, toFrontendMsg)
 
 import Browser exposing (UrlRequest)
 import Browser.Navigation exposing (Key)
 import Html
-import Lamdera exposing (ClientId, SessionId, Url, sendToBackend, sendToFrontend)
+import Lamdera exposing (ClientId, SessionId, Url)
 import Task exposing (Task)
+
+
+
+--toFrontendMsg : toFrontend -> ToFrontend toFrontend dataError data
+
+
+toFrontendMsg =
+    UserToFrontend
+
+
+toBackendMsg : toBackend -> ToBackend toBackend
+toBackendMsg =
+    UserToBackend
 
 
 type Model model
@@ -12,7 +25,7 @@ type Model model
     | UserModel model
 
 
-type Msg msg
+type FrontendMsg msg
     = UserMsg msg
     | SendUrlChangeToBackend Url
 
@@ -49,24 +62,26 @@ type BackendMsg dataError data backendModel backendMsg
 
 
 frontend :
-    { init : Url -> Key -> Blockable (Result dataError data) ( model, Cmd frontendMsg )
-    , view : model -> Browser.Document frontendMsg
-    , update : frontendMsg -> model -> ( model, Cmd frontendMsg )
-    , updateFromBackend : toFrontend -> model -> ( model, Cmd frontendMsg )
-    , subscriptions : model -> Sub frontendMsg
-    , onUrlRequest : UrlRequest -> frontendMsg
-    , onUrlChange : Url -> Blockable (Result dataError data) frontendMsg
-    }
+    (ToBackend toBackend -> Cmd (FrontendMsg frontendMsg))
     ->
-        { init : Url -> Browser.Navigation.Key -> ( Model model, Cmd (Msg frontendMsg) )
-        , view : Model model -> Browser.Document (Msg frontendMsg)
-        , update : Msg frontendMsg -> Model model -> ( Model model, Cmd (Msg frontendMsg) )
-        , updateFromBackend : ToFrontend toFrontend dataError data -> Model model -> ( Model model, Cmd (Msg frontendMsg) )
-        , subscriptions : Model model -> Sub (Msg frontendMsg)
-        , onUrlRequest : Browser.UrlRequest -> Msg frontendMsg
-        , onUrlChange : Url -> Msg frontendMsg
+        { init : Url -> Key -> Blockable (Result dataError data) ( model, Cmd frontendMsg )
+        , view : model -> Browser.Document frontendMsg
+        , update : frontendMsg -> model -> ( model, Cmd frontendMsg )
+        , updateFromBackend : toFrontend -> model -> ( model, Cmd frontendMsg )
+        , subscriptions : model -> Sub frontendMsg
+        , onUrlRequest : UrlRequest -> frontendMsg
+        , onUrlChange : Url -> Blockable (Result dataError data) frontendMsg
         }
-frontend config =
+    ->
+        { init : Url -> Browser.Navigation.Key -> ( Model model, Cmd (FrontendMsg frontendMsg) )
+        , view : Model model -> Browser.Document (FrontendMsg frontendMsg)
+        , update : FrontendMsg frontendMsg -> Model model -> ( Model model, Cmd (FrontendMsg frontendMsg) )
+        , updateFromBackend : ToFrontend toFrontend dataError data -> Model model -> ( Model model, Cmd (FrontendMsg frontendMsg) )
+        , subscriptions : Model model -> Sub (FrontendMsg frontendMsg)
+        , onUrlRequest : Browser.UrlRequest -> FrontendMsg frontendMsg
+        , onUrlChange : Url -> FrontendMsg frontendMsg
+        }
+frontend sendToBackend config =
     { init =
         \url key ->
             case config.init url key of
@@ -145,19 +160,21 @@ frontend config =
 
 
 backend :
-    { init : ( backendModel, Cmd backendMsg )
-    , onRequest : ServerRequest -> backendModel -> Task dataError ( backendModel, data, List HeadTag )
-    , update : backendMsg -> backendModel -> ( backendModel, Cmd backendMsg )
-    , updateFromFrontend : SessionId -> ClientId -> toBackend -> backendModel -> ( backendModel, Cmd backendMsg )
-    , subscriptions : backendModel -> Sub backendMsg
-    }
+    (ClientId -> ToFrontend backendMsg dataError data -> Cmd (BackendMsg dataError data backendModel backendMsg))
+    ->
+        { init : ( backendModel, Cmd backendMsg )
+        , onRequest : ServerRequest -> backendModel -> Task dataError ( backendModel, data, List HeadTag )
+        , update : backendMsg -> backendModel -> ( backendModel, Cmd backendMsg )
+        , updateFromFrontend : SessionId -> ClientId -> toBackend -> backendModel -> ( backendModel, Cmd backendMsg )
+        , subscriptions : backendModel -> Sub backendMsg
+        }
     ->
         { init : ( backendModel, Cmd (BackendMsg dataError data backendModel backendMsg) )
         , update : BackendMsg dataError data backendModel backendMsg -> backendModel -> ( backendModel, Cmd (BackendMsg dataError data backendModel backendMsg) )
         , updateFromFrontend : SessionId -> ClientId -> ToBackend toBackend -> backendModel -> ( backendModel, Cmd (BackendMsg dataError data backendModel backendMsg) )
         , subscriptions : backendModel -> Sub (BackendMsg dataError data backendModel backendMsg)
         }
-backend config =
+backend sendToFrontend config =
     { init =
         config.init
             |> Tuple.mapSecond (Cmd.map UserBackendMsg)
