@@ -62,7 +62,7 @@ type BackendMsg dataError data backendModel backendMsg
 
 
 frontend :
-    (ToBackend toBackend -> Cmd (FrontendMsg frontendMsg))
+    (ToBackend toBackend -> Cmd frontendMsg)
     ->
         { init : Url -> Key -> Blockable (Result dataError data) ( model, Cmd frontendMsg )
         , view : model -> Browser.Document frontendMsg
@@ -92,6 +92,7 @@ frontend sendToBackend config =
                     -- TODO use blockingInitFn
                     ( Initializing
                     , sendToBackend (UrlChanged url)
+                        |> Cmd.map UserMsg
                     )
     , view =
         \model ->
@@ -118,7 +119,10 @@ frontend sendToBackend config =
                             ( UserModel newUserModel, cmd |> Cmd.map UserMsg )
 
                 SendUrlChangeToBackend serverRequest ->
-                    ( model, sendToBackend (UrlChanged serverRequest) )
+                    ( model
+                    , sendToBackend (UrlChanged serverRequest)
+                        |> Cmd.map UserMsg
+                    )
     , updateFromBackend =
         \toFrontend model ->
             case toFrontend of
